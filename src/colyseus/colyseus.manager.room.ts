@@ -16,4 +16,7 @@ export class RoomManager {
       room.broadcast(event, data);
     }
   }
+  static getRoom(){
+    return this.rooms;
+  }
 }

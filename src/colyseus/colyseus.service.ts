@@ -57,4 +57,9 @@ export class GameService implements OnApplicationShutdown {
       .limit(20);
     return history;
   }
+  async enableRealtimeListing(name: string, room: Type<Room<any, any>>) {
+    if (!this.server) return;
+        this.server.define(name, room).enableRealtimeListing();
+  }
+
 }

@@ -53,14 +53,45 @@ export class ChatRoom extends Room<ChatRoomState> {
         await gameSvc.saveMessage(this.roomId, player.name, data);
       }
     });
-  }
+    // client là người gửi, data thì gồm to và message
+    this.onMessage("private_message", (client, data) => {
+        const { to, message } = data;
 
+        // Duyệt tất cả phòng đang hoạt động
+        RoomManager.getRoom().forEach((room) => {
+          // Tìm client có sessionId === to
+          const recipient = room.clients.find(c => c.sessionId === to);
+            if(to == client.sessionId){
+              client.send("error", {
+                message: "không thể gửi tin nhắn cho chính mình",
+              })
+              return;
+            }
+            if (recipient) {
+              recipient.send("private_message", {
+                from: client.sessionId,
+                message,
+              });
+            }
+        });
+      });
+        // this broadcast: gửi tin nhắn cho những người trong cùng room thôi 
+    this.onMessage("broadcast_message", (client, data) => {
+      const { message } = data;
+
+      this.broadcast("broadcast_message", {
+        from: client.sessionId,
+        message,
+      });
+    });
+    }
+  // sao chỗ này có async?
   async onJoin(client: Client, options: any) {
     const player = new Player();
     player.name = options.name || "Unknown";
     this.logger.log(`${player.name} joined room ${this.roomId}`);
     this.state.players.set(client.sessionId, player);
-
+   
     const gameSvc = Globals.nestApp.get(GameService);
 
     // Lấy 20 tin nhắn gần nhất, sắp theo thời gian tăng dần
