@@ -16,6 +16,10 @@ export class PlayerModel extends Document {
   @IsString()
   message: string;
 
+  @Prop({ type: "string", default: "Anonymous" })
+  @IsString()
+  sendTo: string;
+
   @Prop()
   @IsDate()
   createdAt: Date;

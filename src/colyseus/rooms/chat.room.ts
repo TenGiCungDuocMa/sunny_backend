@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
 /* eslint-disable @typescript-eslint/no-base-to-string */
@@ -12,12 +12,14 @@ import { Logger } from "@nestjs/common";
 import { Model } from "mongoose";
 import { GameService } from "../colyseus.service";
 import { Globals } from "src/utils/globals";
+import { RoomManager } from "../colyseus.manager.room";
 
 export class ChatRoom extends Room<ChatRoomState> {
   maxClients: number;
   private readonly logger = new Logger(ChatRoom.name);
   private colyseusService: GameService;
   onCreate(options: any) {
+    RoomManager.register(this);
     this.state = new ChatRoomState();
     this.maxClients = 10;
     const gameSvc = Globals.nestApp.get(GameService);
@@ -38,6 +40,17 @@ export class ChatRoom extends Room<ChatRoomState> {
       const player = this.state.players.get(client.sessionId);
       if (player) {
         player.name = data;
+      }
+    });
+
+    this.onMessage("broadcast-all", async (client, data) => {
+      RoomManager.broadcastToAll("server_announcement", {
+        // message: "🚨🚨 Server sắp bảo trì trong 5 năm!🚨🚨",
+        message: data,
+      });
+      const player = this.state.players.get(client.sessionId);
+      if (player) {
+        await gameSvc.saveMessage(this.roomId, player.name, data);
       }
     });
   }
@@ -69,6 +82,7 @@ export class ChatRoom extends Room<ChatRoomState> {
   }
 
   onDispose() {
+    RoomManager.unregister(this);
     this.logger.log("Room disposed");
   }
 }
