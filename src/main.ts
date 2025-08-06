@@ -1,31 +1,39 @@
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { createServer } from 'http';
-import { Server } from 'colyseus';
-import { WebSocketTransport } from '@colyseus/ws-transport';
-import { ChatRoom } from './colyseus/rooms/chat.room';
-import { playground } from '@colyseus/playground';
-import { monitor } from '@colyseus/monitor';
+/* eslint-disable @typescript-eslint/no-floating-promises */
+import { NestFactory } from "@nestjs/core";
+import { AppModule } from "./app.module";
+import { ChatRoom } from "./colyseus/rooms/chat.room";
+import { ExpressAdapter } from "@nestjs/platform-express";
+import { GameService } from "./colyseus/colyseus.service";
+import { Globals } from "./utils/globals";
+import express from "express";
+import * as http from "http";
+
+const PORT = Number(process.env.PORT);
+const ROOMS = [ChatRoom];
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const expressApp = app.getHttpAdapter().getInstance();
+  const app = express();
 
-  const server = createServer(expressApp);
-  const gameServer = new Server({
-    transport: new WebSocketTransport({ server }),
+  const nestApp = await NestFactory.create(AppModule, new ExpressAdapter(app));
+  nestApp.enableShutdownHooks();
+  nestApp.enableCors();
+  await nestApp.init();
+  const httpServer = http.createServer(app);
+
+  const gameSvc = nestApp.get(GameService);
+
+  gameSvc.createServer(httpServer);
+
+  ROOMS.forEach((r) => {
+    console.info(`Registering room: ${r.name}`);
+    gameSvc.defineRoom(r.name, r);
   });
 
-  gameServer.define("my_room", ChatRoom);
-
-  expressApp.use('/playground', playground());
-  expressApp.use('/monitor', monitor());
-
-  await app.init();
-
-  server.listen(2567, () => {
-    console.log('Colyseus listening on ws://localhost:2567');
-    console.log('Playground UI at http://localhost:2567/playground');
+  await gameSvc.listen(PORT).then(() => {
+    console.info(
+      `Application started on ${PORT} at ${new Date().toLocaleDateString()}`,
+    );
+    Globals.nestApp = nestApp;
   });
 }
 bootstrap();
